@@ -3,10 +3,14 @@ import org.gradle.api.tasks.wrapper.Wrapper.DistributionType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    `maven-publish`
     kotlin("jvm") version "1.5.31"
+    id("org.jetbrains.dokka") version "1.5.31"
+    id("org.ajoberstar.grgit") version "4.1.0"
 }
 
 group = "com.github.lion7"
+version = grgit.describe()
 
 repositories {
     mavenCentral()
@@ -14,7 +18,6 @@ repositories {
 
 dependencies {
     implementation("org.apache.jmeter:ApacheJMeter_http:5.4.1")
-    implementation("org.junit.jupiter:junit-jupiter-api:5.7.2")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
     testImplementation("ch.qos.logback:logback-classic:1.2.6")
@@ -29,6 +32,10 @@ configurations {
     }
 }
 
+java {
+    withSourcesJar()
+}
+
 tasks {
     wrapper {
         gradleVersion = "7.2"
@@ -39,30 +46,38 @@ tasks {
         options.compilerArgs = listOf("-parameters", "-Werror")
         options.encoding = "UTF-8"
 
-        sourceCompatibility = "15"
-        targetCompatibility = "15"
+        sourceCompatibility = "11"
+        targetCompatibility = "11"
     }
 
     withType<KotlinCompile> {
         kotlinOptions {
             freeCompilerArgs = listOf("-java-parameters", "-Xjsr305=strict", "-Werror")
-            jvmTarget = "15"
+            jvmTarget = "11"
         }
     }
 
-    val copyJMeterResources = register<Sync>("copyJMeterResources") {
-        from("src/main/jmeter")
-        into("build/jmeter/bin")
-    }
-
     test {
-        dependsOn(copyJMeterResources)
-
         useJUnitPlatform()
         jvmArgs("-Djava.security.egd=file:/dev/urandom")
 
         testLogging {
             events(*TestLogEvent.values())
+        }
+    }
+
+    register<Jar>("javadocJar") {
+        dependsOn(dokkaJavadoc)
+        archiveClassifier.set("javadoc")
+        from(dokkaJavadoc.get().outputDirectory)
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("default") {
+            from(components["java"])
+            artifact(tasks["javadocJar"])
         }
     }
 }
