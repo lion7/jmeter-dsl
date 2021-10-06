@@ -46,14 +46,14 @@ tasks {
         options.compilerArgs = listOf("-parameters", "-Werror")
         options.encoding = "UTF-8"
 
-        sourceCompatibility = "11"
-        targetCompatibility = "11"
+        sourceCompatibility = "1.8"
+        targetCompatibility = "1.8"
     }
 
     withType<KotlinCompile> {
         kotlinOptions {
             freeCompilerArgs = listOf("-java-parameters", "-Xjsr305=strict", "-Werror")
-            jvmTarget = "11"
+            jvmTarget = "1.8"
         }
     }
 

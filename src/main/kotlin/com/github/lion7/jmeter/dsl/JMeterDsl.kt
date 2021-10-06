@@ -52,6 +52,7 @@ import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.io.path.copyTo
 import kotlin.io.path.toPath
 import kotlin.reflect.KClass
@@ -69,7 +70,7 @@ class JMeterDsl {
             if (JMeterUtils.getJMeterHome() != null) return
 
             // Determine the JMeter home dir
-            val jMeterHome: Path = System.getProperty("jmeter.outputDir")?.let(Path::of) ?: Files.createTempDirectory("jmeter-dsl").also { tempDir ->
+            val jMeterHome: Path = System.getProperty("jmeter.outputDir")?.let(Paths::get) ?: Files.createTempDirectory("jmeter-dsl").also { tempDir ->
                 Runtime.getRuntime().addShutdownHook(Thread { tempDir.toFile().deleteRecursively() })
             }
 
