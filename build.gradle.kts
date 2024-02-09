@@ -4,9 +4,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `maven-publish`
-    kotlin("jvm") version "1.5.31"
-    id("org.jetbrains.dokka") version "1.5.31"
-    id("org.ajoberstar.grgit") version "4.1.0"
+    kotlin("jvm") version "1.9.22"
+    id("org.jetbrains.dokka") version "1.9.10"
+    id("org.ajoberstar.grgit") version "4.1.1"
 }
 
 group = "com.github.lion7"
@@ -19,8 +19,8 @@ repositories {
 dependencies {
     implementation("org.apache.jmeter:ApacheJMeter_http:5.4.3")
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.8.2")
-    testImplementation("ch.qos.logback:logback-classic:1.2.10")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("ch.qos.logback:logback-classic:1.4.14")
 }
 
 configurations {
@@ -36,24 +36,19 @@ java {
     withSourcesJar()
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 tasks {
     wrapper {
-        gradleVersion = "7.2"
+        gradleVersion = "8.6"
         distributionType = DistributionType.ALL
-    }
-
-    withType<JavaCompile> {
-        options.compilerArgs = listOf("-parameters", "-Werror")
-        options.encoding = "UTF-8"
-
-        sourceCompatibility = "1.8"
-        targetCompatibility = "1.8"
     }
 
     withType<KotlinCompile> {
         kotlinOptions {
             freeCompilerArgs = listOf("-java-parameters", "-Xjsr305=strict", "-Werror")
-            jvmTarget = "1.8"
         }
     }
 
