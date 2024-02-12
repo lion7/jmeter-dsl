@@ -21,7 +21,6 @@ import org.apache.jmeter.control.gui.WhileControllerGui
 import org.apache.jmeter.engine.StandardJMeterEngine
 import org.apache.jmeter.extractor.XPath2Extractor
 import org.apache.jmeter.extractor.gui.XPath2ExtractorGui
-import org.apache.jmeter.gui.HtmlReportUI
 import org.apache.jmeter.gui.JMeterGUIComponent
 import org.apache.jmeter.gui.TestElementMetadata
 import org.apache.jmeter.protocol.http.control.Header
@@ -246,9 +245,7 @@ class JMeterDsl {
 
     @JMeterDslMarker
     fun ThreadGroup.htmlReport(configure: HtmlReport.() -> Unit) =
-        testElement(this, createTestElement<HtmlReport>().apply {
-            schema.guiClass[this] = HtmlReportUI::class.qualifiedName
-        }, configure)
+        testElement<HtmlReport, HtmlReportVisualizer>(this, configure)
 
     private fun <T : TestElement> testElement(
         parent: TestElement,
