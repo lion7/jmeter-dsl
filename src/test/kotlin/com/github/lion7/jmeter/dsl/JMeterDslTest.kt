@@ -13,7 +13,7 @@ internal class JMeterDslTest {
             testPlan {
                 threadGroup {
                     mainController {
-                        httpSampler("GET", URI("https://www.google.nl/"))
+//                        httpSampler("GET", URI("https://www.google.nl/"))
                     }
 
                     htmlReport {

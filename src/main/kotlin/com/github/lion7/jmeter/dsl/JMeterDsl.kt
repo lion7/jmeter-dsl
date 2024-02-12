@@ -49,12 +49,15 @@ import org.apache.jmeter.visualizers.ViewResultsFullVisualizer
 import org.apache.jorphan.collections.HashTree
 import org.apache.jorphan.collections.ListedHashTree
 import java.io.File
+import java.net.JarURLConnection
 import java.net.URI
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.IdentityHashMap
 import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
 import kotlin.io.path.toPath
 
 class JMeterDsl {
@@ -77,8 +80,14 @@ class JMeterDsl {
                     }
 
             // Unzip bundled resources
-            val jmeterResources = JMeterDsl::class.java.getResource("/jmeter/jmeter.properties")!!.toURI().resolve(".")
-            jmeterResources.toPath().copyRecursively(jMeterHome.resolve("bin"))
+            val jmeterProperties = JMeterDsl::class.java.getResource("/jmeter/jmeter.properties")
+                ?: throw IllegalStateException("Failed to find bundled resources")
+            val jmeterResources: Path = when (val conn = jmeterProperties.openConnection()) {
+                is JarURLConnection -> FileSystems.newFileSystem(conn.jarFileURL.toURI().toPath()).getPath("jmeter")
+                else -> jmeterProperties.toURI().toPath().resolve("..").normalize()
+            }
+            val targetDir = jMeterHome.resolve("bin").createDirectories()
+            jmeterResources.copyRecursively(targetDir)
 
             // JMeter initialization (properties, log levels, locale, etc)
             JMeterUtils.setJMeterHome(jMeterHome.toString())
@@ -89,8 +98,10 @@ class JMeterDsl {
             JMeterUtils.getLocalHostFullName()
         }
 
-        private fun Path.copyRecursively(target: Path) = Files.walk(this).forEachOrdered { source ->
-            source.copyTo(target.resolve(relativize(source)), true)
+        private fun Path.copyRecursively(targetDir: Path) = Files.walk(this).forEachOrdered { source ->
+            val path = relativize(source).toString()
+            val target = targetDir.resolve(path)
+            source.copyTo(target, true)
         }
     }
 
