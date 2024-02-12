@@ -22,6 +22,7 @@ import org.apache.jmeter.engine.StandardJMeterEngine
 import org.apache.jmeter.extractor.XPath2Extractor
 import org.apache.jmeter.extractor.gui.XPath2ExtractorGui
 import org.apache.jmeter.gui.HtmlReportUI
+import org.apache.jmeter.gui.JMeterGUIComponent
 import org.apache.jmeter.gui.TestElementMetadata
 import org.apache.jmeter.protocol.http.control.Header
 import org.apache.jmeter.protocol.http.control.HeaderManager
@@ -53,9 +54,9 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.IdentityHashMap
 import kotlin.io.path.copyTo
 import kotlin.io.path.toPath
-import kotlin.reflect.KClass
 
 class JMeterDsl {
 
@@ -70,9 +71,11 @@ class JMeterDsl {
             if (JMeterUtils.getJMeterHome() != null) return
 
             // Determine the JMeter home dir
-            val jMeterHome: Path = System.getProperty("jmeter.outputDir")?.let(Paths::get) ?: Files.createTempDirectory("jmeter-dsl").also { tempDir ->
-                Runtime.getRuntime().addShutdownHook(Thread { tempDir.toFile().deleteRecursively() })
-            }
+            val jMeterHome: Path =
+                System.getProperty("jmeter.outputDir")?.let(Paths::get) ?: Files.createTempDirectory("jmeter-dsl")
+                    .also { tempDir ->
+                        Runtime.getRuntime().addShutdownHook(Thread { tempDir.toFile().deleteRecursively() })
+                    }
 
             // Unzip bundled resources
             val jmeterResources = JMeterDsl::class.java.getResource("/jmeter/jmeter.properties")!!.toURI().resolve(".")
@@ -95,8 +98,8 @@ class JMeterDsl {
     // root test tree
     private val tree: HashTree = ListedHashTree()
 
-    // map with sub trees
-    private val subTrees = mutableMapOf<TestElement, HashTree>()
+    // map with subtrees
+    private val subTrees = IdentityHashMap<TestElement, HashTree>()
 
     @JMeterDslMarker
     fun run() {
@@ -112,21 +115,14 @@ class JMeterDsl {
 
     @JMeterDslMarker
     fun testPlan(configure: TestPlan.() -> Unit) {
-        val testPlan = TestPlan().apply {
-            // defaults
-            setProperty(TestElement.TEST_CLASS, TestPlan::class.java.name)
-            setProperty(TestElement.GUI_CLASS, TestPlanGui::class.java.name)
-            name = "Test Plan"
-            isEnabled = true
-        }
-
+        val testPlan = createTestElementWithGui<TestPlan, TestPlanGui>()
         subTrees[testPlan] = tree.add(testPlan)
-
         testPlan.configure()
     }
 
     @JMeterDslMarker
-    fun TestPlan.setupThreadGroup(configure: SetupThreadGroup.() -> Unit) = testElement<SetupThreadGroup, SetupThreadGroupGui>(this, configure)
+    fun TestPlan.setupThreadGroup(configure: SetupThreadGroup.() -> Unit) =
+        testElement<SetupThreadGroup, SetupThreadGroupGui>(this, configure)
 
     @JMeterDslMarker
     fun TestPlan.threadGroup(configure: ThreadGroup.() -> Unit) = testElement<ThreadGroup, ThreadGroupGui>(this) {
@@ -136,47 +132,56 @@ class JMeterDsl {
 
     @JMeterDslMarker
     fun ThreadGroup.mainController(configure: LoopController.() -> Unit) {
-        val controller = LoopController().apply {
-            // defaults
-            setProperty(TestElement.TEST_CLASS, LoopController::class.java.name)
-            setProperty(TestElement.GUI_CLASS, LoopControlPanel::class.java.name)
+        schema.mainController.getOrNull(this)?.let(subTrees::remove)
+        val controller = testElement<LoopController, LoopControlPanel>(this) {
             name = "Main Controller"
-            isEnabled = true
+            loops = 1
+            setContinueForever(false)
         }
-        samplerController?.let(subTrees::remove)
-        subTrees[controller] = subTrees.getValue(this) // special case: use the tree of the thread group
-        setSamplerController(controller)
-
-        controller.loops = 1
+        schema.mainController[this] = controller
         controller.configure()
     }
 
     @JMeterDslMarker
-    fun Controller.loopController(configure: LoopController.() -> Unit) = testElement<LoopController, LoopControlPanel>(this, configure)
+    fun Controller.loopController(configure: LoopController.() -> Unit) =
+        testElement<LoopController, LoopControlPanel>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.onceOnlyController(configure: OnceOnlyController.() -> Unit) = testElement<OnceOnlyController, OnceOnlyControllerGui>(this, configure)
+    fun Controller.onceOnlyController(configure: OnceOnlyController.() -> Unit) =
+        testElement<OnceOnlyController, OnceOnlyControllerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.whileController(configure: WhileController.() -> Unit) = testElement<WhileController, WhileControllerGui>(this, configure)
+    fun Controller.whileController(configure: WhileController.() -> Unit) =
+        testElement<WhileController, WhileControllerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.runTimeController(configure: RunTime.() -> Unit) = testElement<RunTime, RunTimeGui>(this, configure)
+    fun Controller.runTimeController(configure: RunTime.() -> Unit) =
+        testElement<RunTime, RunTimeGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.randomOrderController(configure: RandomOrderController.() -> Unit) = testElement<RandomOrderController, RandomOrderControllerGui>(this, configure)
+    fun Controller.randomOrderController(configure: RandomOrderController.() -> Unit) =
+        testElement<RandomOrderController, RandomOrderControllerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.interleaveController(configure: InterleaveControl.() -> Unit) = testElement<InterleaveControl, InterleaveControlGui>(this, configure)
+    fun Controller.interleaveController(configure: InterleaveControl.() -> Unit) =
+        testElement<InterleaveControl, InterleaveControlGui>(this, configure)
 
     @JMeterDslMarker
-    fun HTTPSamplerBase.headerManager(configure: HeaderManager.() -> Unit) = testElement<HeaderManager, HeaderPanel>(this, configure)
+    fun HTTPSamplerBase.headerManager(configure: HeaderManager.() -> Unit) =
+        testElement<HeaderManager, HeaderPanel>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.httpSampler(configure: HTTPSamplerProxy.() -> Unit) = testElement<HTTPSamplerProxy, HttpTestSampleGui>(this, configure)
+    fun Controller.httpSampler(configure: HTTPSamplerProxy.() -> Unit) =
+        testElement<HTTPSamplerProxy, HttpTestSampleGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.httpSampler(method: String, uri: URI, headers: Map<String, String> = emptyMap(), formData: List<Pair<String, String>> = emptyList(), files: List<Pair<String, File>> = emptyList()) = httpSampler {
+    fun Controller.httpSampler(
+        method: String,
+        uri: URI,
+        headers: Map<String, String> = emptyMap(),
+        formData: List<Pair<String, String>> = emptyList(),
+        files: List<Pair<String, File>> = emptyList()
+    ) = httpSampler {
         this.method = method
         this.path = uri.toASCIIString()
         headerManager {
@@ -190,59 +195,90 @@ class JMeterDsl {
 
         if (files.isNotEmpty()) {
             // copy content from the provided file and make sure it is POSTed as raw data
-            httpFiles = files.map { HTTPFileArg(it.second.absolutePath, it.first, Files.probeContentType(it.second.toPath())) }.toTypedArray()
+            httpFiles =
+                files.map { HTTPFileArg(it.second.absolutePath, it.first, Files.probeContentType(it.second.toPath())) }
+                    .toTypedArray()
             postBodyRaw = true
         }
     }
 
     @JMeterDslMarker
-    fun Controller.constantTimer(configure: ConstantTimer.() -> Unit) = testElement<ConstantTimer, ConstantTimerGui>(this, configure)
+    fun Controller.constantTimer(configure: ConstantTimer.() -> Unit) =
+        testElement<ConstantTimer, ConstantTimerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.gaussianRandomTimer(configure: GaussianRandomTimer.() -> Unit) = testElement<GaussianRandomTimer, GaussianRandomTimerGui>(this, configure)
+    fun Controller.gaussianRandomTimer(configure: GaussianRandomTimer.() -> Unit) =
+        testElement<GaussianRandomTimer, GaussianRandomTimerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.preciseThroughputTimer(configure: PreciseThroughputTimer.() -> Unit) = testElement<PreciseThroughputTimer, PoissonRandomTimerGui>(this, configure)
+    fun Controller.preciseThroughputTimer(configure: PreciseThroughputTimer.() -> Unit) =
+        testElement<PreciseThroughputTimer, PoissonRandomTimerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Controller.constantThroughputTimer(configure: ConstantThroughputTimer.() -> Unit) = testElement<ConstantThroughputTimer, PoissonRandomTimerGui>(this, configure)
+    fun Controller.constantThroughputTimer(configure: ConstantThroughputTimer.() -> Unit) =
+        testElement<ConstantThroughputTimer, PoissonRandomTimerGui>(this, configure)
 
     @JMeterDslMarker
-    fun Sampler.responseAssertion(configure: ResponseAssertion.() -> Unit) = testElement<ResponseAssertion, AssertionGui>(this, configure)
+    fun Sampler.responseAssertion(configure: ResponseAssertion.() -> Unit) =
+        testElement<ResponseAssertion, AssertionGui>(this, configure)
 
     @JMeterDslMarker
-    fun Sampler.responseCodeAssertion(responseCode: Int, configure: ResponseAssertion.() -> Unit = {}) = responseAssertion {
-        setTestFieldResponseCode()
-        setToEqualsType()
-        addTestString(responseCode.toString())
+    fun Sampler.responseCodeAssertion(responseCode: Int, configure: ResponseAssertion.() -> Unit = {}) =
+        responseAssertion {
+            setTestFieldResponseCode()
+            setToEqualsType()
+            addTestString(responseCode.toString())
 
-        configure()
-    }
-
-    @JMeterDslMarker
-    fun Sampler.xpath2Assertion(configure: XPath2Assertion.() -> Unit) = testElement<XPath2Assertion, XPath2AssertionGui>(this, configure)
-
-    @JMeterDslMarker
-    fun Sampler.xpath2Extractor(configure: XPath2Extractor.() -> Unit) = testElement<XPath2Extractor, XPath2ExtractorGui>(this, configure)
-
-    @JMeterDslMarker
-    fun ThreadGroup.viewResultsTree(configure: ResultCollector.() -> Unit) = testElement<ResultCollector, ViewResultsFullVisualizer>(this, configure)
-
-    @JMeterDslMarker
-    fun ThreadGroup.htmlReport(configure: HtmlReport.() -> Unit) = testElement<HtmlReport, HtmlReportUI>(this, configure)
-
-    fun <T : TestElement, G : Any> testElement(parent: TestElement, testClass: KClass<T>, guiClass: KClass<G>, configure: T.() -> Unit) {
-        val element = testClass.java.getConstructor().newInstance()
-        subTrees[element] = subTrees.getValue(parent).add(element)
-        element.apply {
-            // defaults
-            setProperty(TestElement.TEST_CLASS, testClass.java.name)
-            setProperty(TestElement.GUI_CLASS, guiClass.java.name)
-            name = guiClass.java.getAnnotation(TestElementMetadata::class.java)?.labelResource?.let(JMeterUtils::getResString) ?: guiClass.java.simpleName
-            isEnabled = true
+            configure()
         }
-        element.apply(configure)
+
+    @JMeterDslMarker
+    fun Sampler.xpath2Assertion(configure: XPath2Assertion.() -> Unit) =
+        testElement<XPath2Assertion, XPath2AssertionGui>(this, configure)
+
+    @JMeterDslMarker
+    fun Sampler.xpath2Extractor(configure: XPath2Extractor.() -> Unit) =
+        testElement<XPath2Extractor, XPath2ExtractorGui>(this, configure)
+
+    @JMeterDslMarker
+    fun ThreadGroup.viewResultsTree(configure: ResultCollector.() -> Unit) =
+        testElement<ResultCollector, ViewResultsFullVisualizer>(this, configure)
+
+    @JMeterDslMarker
+    fun ThreadGroup.htmlReport(configure: HtmlReport.() -> Unit) =
+        testElement(this, createTestElement<HtmlReport>().apply {
+            schema.guiClass[this] = HtmlReportUI::class.qualifiedName
+        }, configure)
+
+    private fun <T : TestElement> testElement(
+        parent: TestElement,
+        element: T,
+        configure: T.() -> Unit
+    ): T {
+        subTrees[element] = subTrees.getValue(parent).add(element)
+        element.configure()
+        return element
     }
 
-    private inline fun <reified T : TestElement, reified G : Any> testElement(parent: TestElement, noinline configure: T.() -> Unit) = testElement(parent, T::class, G::class, configure)
+    private inline fun <reified T : TestElement, reified G : JMeterGUIComponent> testElement(
+        parent: TestElement,
+        noinline configure: T.() -> Unit = {}
+    ) = testElement(parent, createTestElementWithGui<T, G>(), configure)
+
+    private inline fun <reified T : TestElement> createTestElement(): T =
+        T::class.java.getConstructor().newInstance().apply {
+            // defaults
+            schema.testClass[this] = T::class.java
+            schema.enabled[this] = true
+            schema.name[this] = T::class.simpleName
+            schema.enabled[this] = true
+        }
+
+    private inline fun <reified T : TestElement, reified G : JMeterGUIComponent> createTestElementWithGui(): T =
+        createTestElement<T>().apply {
+            schema.guiClass[this] = G::class.java
+            schema.name[this] =
+                G::class.java.getAnnotation(TestElementMetadata::class.java)?.labelResource?.let(JMeterUtils::getResString)
+                    ?: G::class.simpleName
+        }
 }

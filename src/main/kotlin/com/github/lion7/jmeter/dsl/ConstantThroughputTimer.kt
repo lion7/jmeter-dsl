@@ -6,7 +6,7 @@ import org.apache.jmeter.timers.ConstantThroughputTimer
 class ConstantThroughputTimer : ConstantThroughputTimer() {
 
     var calcMode: Mode
-        get() = Mode.values()[getPropertyAsInt("calcMode")]
+        get() = Mode.entries[getPropertyAsInt("calcMode")]
         set(value) {
             super.setCalcMode(value.ordinal)
             setProperty("calcMode", value.ordinal)

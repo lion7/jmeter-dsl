@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.apache.jmeter:ApacheJMeter_http:5.4.3")
+    implementation("org.apache.jmeter:ApacheJMeter_http:5.6.3")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("ch.qos.logback:logback-classic:1.4.14")
