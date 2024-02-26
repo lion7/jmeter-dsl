@@ -194,7 +194,7 @@ class JMeterDsl {
     ) = httpSampler {
         this.method = method
         this.path = uri.toASCIIString()
-        headerManager {
+        this.headerManager = headerManager {
             headers.map { Header(it.key, it.value) }.forEach(this::add)
         }
 
